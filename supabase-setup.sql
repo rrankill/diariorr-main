@@ -72,7 +72,7 @@ create table if not exists public.study_room (
 
 -- Replace this value with your administrator email before running the setup.
 insert into public.study_room (id, admin_email)
-values (true, 'SUBSTITUA_PELO_SEU_EMAIL')
+values (true, 'rayanessanntana@gmail.com')
 on conflict (id) do update
 set admin_email = excluded.admin_email
 where public.study_room.admin_id is null;
