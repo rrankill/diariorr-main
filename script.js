@@ -214,7 +214,7 @@ function tick(){var t=document.getElementById("tm");if(t){t.textContent=ft(sess(
 setInterval(tick,1000);document.addEventListener("visibilitychange",tick);
 
 async function ensureSupabase(){
- if(!sb){var c=window.SUPABASE_CONFIG;if(!window.supabase||!c||!c.url||!c.anonKey)throw new Error("Configure o Supabase em supabase-config.js.");sb=window.supabase.createClient(c.url,c.anonKey)}
+ if(!sb){var c=window.SUPABASE_CONFIG;if(!window.supabase||!c||!c.url||!c.anonKey)throw new Error("Configure o Supabase em supabase-config.js.");sb=window.supabase.createClient(c.url,c.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}
  if(!authListener){sb.auth.onAuthStateChange(function(event,session){
   sbUser=session&&session.user||null;
   if(event=="PASSWORD_RECOVERY"){passwordRecovery=true;tab="rank";UM="Link de recuperação confirmado. Defina uma nova senha abaixo.";render();return}
@@ -226,7 +226,7 @@ async function ensureSupabase(){
      if(status.data.can_claim_admin&&!status.data.is_admin){var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Não foi possível ativar o administrador: "+fileError(claim.error))}
      if(status.data.can_claim_admin||status.data.is_admin){UM="Acesso de administrador confirmado.";tab="estudar";await refreshGame()}
      else if(status.data.joined){UM="Acesso de convidado confirmado.";tab="estudar";await refreshGame()}
-     else if(new URLSearchParams(location.search).has("invite")){UM="E-mail confirmado. Clique em Entrar para aceitar o convite.";render()}
+     else if(new URLSearchParams(location.search).has("invite")){await refreshGame(true)}
      else{UM="Esta conta não é de administrador. Abra um link de convite e entre como convidado.";render()}
     }catch(e){UM=explainAuthError(e);render()}
     finally{adminBusy=false;render()}
@@ -273,7 +273,7 @@ async function adminAuth(action){
    out=await sb.auth.signUp({email:email.trim(),password:password,options:{emailRedirectTo:emailRedirectTo}});if(out.error)throw out.error;sbUser=out.data.session?out.data.user:null;
    if(!out.data.session){
     if(out.data.user&&Array.isArray(out.data.user.identities)&&out.data.user.identities.length===0){UM="Este e-mail já possui cadastro. Se ainda não confirmou, procure a mensagem de confirmação; depois, use Entrar com sua senha.";return}
-    UM="Cadastro enviado. Confirme o e-mail recebido. Depois, volte para esta página e clique em Entrar.";return
+    UM="Cadastro enviado. Confirme o e-mail recebido. Ao voltar para esta página, o acesso será ativado automaticamente.";return
    }
    var status=await sb.rpc("study_status");if(status.error)throw status.error;
    if(!status.data.can_claim_admin){
