@@ -28,7 +28,7 @@ function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;
 function ft(s){s=Math.floor(s);var h=Math.floor(s/3600),m=Math.floor(s%3600/60);return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
 function fh(s){var m=Math.floor(s/60);return m>=60?Math.floor(m/60)+"h"+String(m%60).padStart(2,"0"):m+" min"}
 
-var ME=blank(),ALL={},FILES=[],myId="local",sb=null,sbUser=null,SB_ERROR="",tab="estudar",sync="local",delF="",UM="",authReady=null,gameJoined=false,isAdmin=false,memberId="",inviteUrl="",authListener=false,adminBusy=false;
+var ME=blank(),ALL={},FILES=[],myId="local",sb=null,sbUser=null,SB_ERROR="",tab="estudar",sync="local",delF="",UM="",authReady=null,gameJoined=false,isAdmin=false,memberId="",inviteUrl="",inviteLocal=false,authListener=false,adminBusy=false,passwordRecovery=false;
 function blank(){return {name:"",log:{},entries:[],mods:{},days:{},run:{on:0,t0:0,acc:0,subj:"Português"},subs:{}}}
 function norm(d){d=d||{};var r=d.run||{},entries=Array.isArray(d.entries)?d.entries.filter(function(e){return e&&Number.isFinite(Number(e.at))&&Number.isFinite(Number(e.seconds))&&Number(e.seconds)>0}).map(function(e){return {at:Number(e.at),seconds:Number(e.seconds)}}):[];if(!Array.isArray(d.entries)){var legacy=Number((d.log||{})[today()]||0);if(legacy>0)entries.push({at:Date.now(),seconds:legacy})}return {name:d.name||"",log:d.log||{},entries:entries,mods:d.mods||{},days:d.days||{},subs:d.subs||{},run:{on:r.on?1:0,t0:r.t0||0,acc:r.acc||0,subj:r.subj||"Português"}}}
 function today(){return iso(new Date())}
@@ -99,28 +99,29 @@ function vRank(){
  if(ps.length<2&&gameJoined&&!isAdmin)h+='<div class="note">Aguardando o administrador compartilhar um convite para o segundo jogador.</div>';
  return h}
 function adminPanel(){
+ if(passwordRecovery)return '<h3 class="sec">Definir nova senha</h3><div class="card" style="padding:18px"><p class="lab">Escolha agora a senha que você usará para entrar no site.</p><label class="lab" for="recovery-password">Nova senha</label><br><input class="txt" id="recovery-password" type="password" autocomplete="new-password"><br><label class="lab" for="recovery-password-confirm">Confirme a nova senha</label><br><input class="txt" id="recovery-password-confirm" type="password" autocomplete="new-password"><div class="bts" style="margin-top:14px"><button class="btn" style="margin:0" data-a="admin-password-update" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Salvando…":"Salvar nova senha")+'</button></div><div class="lab" id="ust" style="margin-top:12px">'+esc(UM)+'</div></div>';
  if(isAdmin){
   var p=memberId&&ALL[memberId],h='<h3 class="sec">Administração dos jogadores</h3><div class="card" style="padding:18px"><b>Administrador</b><p class="lab">Você controla o convite e pode remover o segundo jogador.</p>';
   if(p)h+='<div class="opp"><div style="flex:1"><b>'+esc(p.name||"Jogador")+'</b><div class="lab">Segundo jogador</div></div><button class="ic" data-a="remove-player" data-i="'+esc(memberId)+'">'+(delF==memberId?"Confirmar remoção":"Remover usuário")+'</button></div>';
-  else h+='<p class="lab">Ainda não há segundo jogador. Gere um convite e envie o link.</p>';
+  else h+='<p class="lab">'+(inviteLocal?"Este site está aberto em um endereço local, que só funciona neste computador. Publique o site na internet para compartilhar um convite.":"Ainda não há segundo jogador. Gere um convite e envie o link.")+'</p>';
   if(!p&&inviteUrl)h+='<div style="display:flex;gap:8px;flex-wrap:wrap"><input class="txt" id="invite-link" readonly value="'+esc(inviteUrl)+'"><button class="btn" style="margin:0" data-a="copy-invite">Copiar link</button></div>';
   if(!p)h+='<div class="bts" style="margin-top:12px"><button class="btn" style="margin:0" data-a="create-invite">Gerar convite</button></div>';
   return h+'<div class="lab" style="margin-top:12px">'+esc(UM)+'</div></div>'
  }
  if(gameJoined)return "";
- return '<h3 class="sec">Acesso do administrador</h3><div class="card" style="padding:18px"><p class="lab">Para criar a conta, use o e-mail definido em admin_email no arquivo supabase-setup.sql. Se o cadastro pedir confirmação, confirme pelo e-mail recebido e depois entre aqui.</p><label class="lab" for="admin-email">E-mail</label><br><input class="txt" id="admin-email" type="email" autocomplete="username"><br><label class="lab" for="admin-password">Senha</label><br><input class="txt" id="admin-password" type="password" autocomplete="'+(adminBusy?"off":"new-password")+'"><div class="bts" style="margin-top:14px"><button class="btn" style="margin:0" data-a="admin-login" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Entrar como administrador")+'</button><button class="btn g" style="margin:0" data-a="admin-signup" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Criar conta")+'</button></div><div class="lab" style="margin-top:12px">'+esc(UM)+'</div></div>'
+ return '<h3 class="sec">Acesso do administrador</h3><div class="card" style="padding:18px"><p class="lab">Para criar sua conta, informe o e-mail definido em admin_email no arquivo supabase-setup.sql e escolha uma senha no campo abaixo. Depois, use esse mesmo e-mail e senha para entrar. O link de confirmação deve retornar a esta página; se aparecer erro, confira Authentication → URL Configuration no Supabase e adicione o endereço publicado do site em Redirect URLs.</p><label class="lab" for="admin-email">E-mail</label><br><input class="txt" id="admin-email" type="email" autocomplete="username"><br><label class="lab" for="admin-password">Senha (crie uma ao cadastrar)</label><br><input class="txt" id="admin-password" type="password" autocomplete="'+(adminBusy?"off":"new-password")+'"><div class="bts" style="margin-top:14px"><button class="btn" style="margin:0" data-a="admin-login" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Entrar como administrador")+'</button><button class="btn g" style="margin:0" data-a="admin-signup" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Criar conta")+'</button></div><div class="lab" id="ust" style="margin-top:12px">'+esc(UM)+'</div></div>'
 }
 
 function setUM(t){UM=t;var e=document.getElementById("ust");if(e)e.textContent=t}
 function fileError(e){return e&&e.message?e.message:String(e||"erro desconhecido")}
 function explainAuthError(e){
  var msg=fileError(e);
- if(/invalid login credentials/i.test(msg))return"Esse e-mail e senha não correspondem a uma conta. Se ainda não criou a conta, clique em Criar conta; se acabou de cadastrar, confirme o e-mail e tente entrar novamente.";
- if(/signups? not allowed|signup is disabled|new user signups are disabled/i.test(msg))return"Cadastros estão desativados no Supabase. Ative Authentication → Providers → Email e permita novos cadastros.";
- if(/user already registered/i.test(msg))return"Este e-mail já possui uma conta. Use Entrar como administrador ou redefina a senha no Supabase.";
- if(/password should be at least|weak password/i.test(msg))return"A senha não atende aos requisitos do Supabase. Use uma senha mais longa (pelo menos 6 caracteres).";
+ if(/invalid login credentials/i.test(msg))return"Esse e-mail e senha não correspondem a uma conta. Confira os dados ou redefina a senha no painel Supabase.";
  if(/email rate limit exceeded|rate limit/i.test(msg))return"O Supabase limitou temporariamente o envio de confirmações. Aguarde e tente novamente.";
- if(/email not confirmed/i.test(msg))return"Confirme o cadastro pelo link enviado ao e-mail antes de entrar.";
+ if(/email not confirmed/i.test(msg))return"Confirme o cadastro pelo link enviado ao e-mail antes de entrar. Confira a caixa de entrada e o spam.";
+ if(/user already registered|already been registered/i.test(msg))return"Este e-mail já possui uma conta. Tente entrar com a senha cadastrada; se ela não funcionar, redefina a senha no Supabase.";
+ if(/signups? not allowed|signup is disabled|new user signups are disabled/i.test(msg))return"Cadastros estão desativados no Supabase. Ative Authentication → Providers → Email e permita novos cadastros.";
+ if(/password should be at least|weak password/i.test(msg))return"A senha não atende aos requisitos do Supabase. Use uma senha mais longa (pelo menos 6 caracteres).";
  return msg
 }
 function explainFileError(e){var msg=fileError(e);if(/bucket not found/i.test(msg))return"Bucket de PDFs não encontrado. No Supabase, abra SQL Editor, execute todo o arquivo supabase-setup.sql e tente novamente.";return msg}
@@ -171,6 +172,7 @@ document.addEventListener("click",function(e){var b=e.target.closest("[data-t],[
  else if(a=="go"){tab="check";render();var el=document.getElementById(b.dataset.s);if(el)el.scrollIntoView()}
  else if(a=="admin-login")adminAuth("login");
  else if(a=="admin-signup")adminAuth("signup");
+ else if(a=="admin-password-update")updateAdminPassword();
  else if(a=="create-invite")createInvite();
  else if(a=="copy-invite")copyInvite();
  else if(a=="remove-player"){if(delF==b.dataset.i)removePlayer(b.dataset.i);else{delF=b.dataset.i;render()}}
@@ -186,8 +188,30 @@ setInterval(tick,1000);document.addEventListener("visibilitychange",tick);
 
 async function ensureSupabase(){
  if(!sb){var c=window.SUPABASE_CONFIG;if(!window.supabase||!c||!c.url||!c.anonKey)throw new Error("Configure o Supabase em supabase-config.js.");sb=window.supabase.createClient(c.url,c.anonKey)}
- if(!authListener){sb.auth.onAuthStateChange(function(event,session){sbUser=session&&session.user||null});authListener=true}
- if(!authReady)authReady=(async function(){var session=await sb.auth.getSession();if(session.error)throw session.error;if(!session.data.session){var login=await sb.auth.signInAnonymously();if(login.error)throw login.error;sbUser=login.data.user}else sbUser=session.data.session.user;if(!sbUser)throw new Error("Não foi possível iniciar a sessão do usuário.")})();
+ if(!authListener){sb.auth.onAuthStateChange(function(event,session){
+  sbUser=session&&session.user||null;
+  if(event=="PASSWORD_RECOVERY"){passwordRecovery=true;tab="rank";UM="Link de recuperação confirmado. Defina uma nova senha abaixo.";render();return}
+  if((event=="SIGNED_IN"||event=="INITIAL_SESSION")&&session&&session.user.email&&!passwordRecovery&&!adminBusy){
+   adminBusy=true;UM="Confirmando o acesso de administrador…";render();
+   setTimeout(function(){(async function(){
+    try{
+     var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Não foi possível ativar o administrador: "+fileError(claim.error));
+     UM="E-mail confirmado e acesso de administrador ativado.";
+     var invite=new URLSearchParams(location.search).get("invite");
+     history.replaceState(null,"",location.pathname+(invite?"?invite="+encodeURIComponent(invite):""));
+     await refreshGame()
+    }catch(e){UM=explainAuthError(e);render()}
+    finally{adminBusy=false;render()}
+   })()},0)
+  }
+ });authListener=true}
+ if(!authReady)authReady=(async function(){
+  var result=await sb.auth.getSession();if(result.error)throw result.error;
+  var session=result.data.session;
+  if(!session){var login=await sb.auth.signInAnonymously();if(login.error)throw login.error;sbUser=login.data.user}
+  else sbUser=session.user;
+  if(!sbUser)throw new Error("Não foi possível iniciar a sessão do usuário.")
+ })();
  await authReady;return sb
 }
 async function refreshGame(){
@@ -196,6 +220,7 @@ async function refreshGame(){
  if(token){var joined=await sb.rpc("join_study_invite",{p_token:token});if(joined.error)throw new Error("Não foi possível aceitar o convite: "+fileError(joined.error));UM="Convite aceito. Você entrou como segundo jogador.";history.replaceState(null,"",location.pathname+location.hash)}
  var st=await sb.rpc("study_status");if(st.error)throw st.error;
  gameJoined=!!st.data.joined;isAdmin=!!st.data.is_admin;memberId=st.data.member_id||"";inviteUrl=isAdmin&&st.data.invite_token?location.origin+location.pathname+"?invite="+encodeURIComponent(st.data.invite_token):"";
+ inviteLocal=/^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|::1)$/i.test(location.hostname);
  ALL={};
  if(gameJoined){var r=await sb.from("study_players").select("user_id,payload");if(r.error)throw r.error;r.data.forEach(function(x){ALL[x.user_id]=norm(x.payload)});ME=ALL[myId]||blank();ALL[myId]=ME}
  else{ME=blank();UM=UM||"Este usuário ainda não faz parte do grupo. Entre como administrador ou abra um link de convite válido."}
@@ -214,10 +239,29 @@ async function adminAuth(action){
   await ensureSupabase();var out;
   if(action=="signup"){
    out=await sb.auth.signUp({email:email.trim(),password:password,options:{emailRedirectTo:location.origin+location.pathname}});if(out.error)throw out.error;sbUser=out.data.session?out.data.user:null;
-   if(!out.data.session){UM="Cadastro enviado. Abra o e-mail de confirmação do Supabase, confirme o endereço e depois entre como administrador.";return}
+   if(!out.data.session){
+    if(out.data.user&&Array.isArray(out.data.user.identities)&&out.data.user.identities.length===0){UM="Este e-mail já possui cadastro. Se ainda não confirmou, procure a mensagem de confirmação no e-mail; se já confirmou, entre com a senha cadastrada.";return}
+    UM="Cadastro enviado. Abra o e-mail de confirmação do Supabase, confirme o endereço e depois entre como administrador.";return
+   }
   }else{out=await sb.auth.signInWithPassword({email:email.trim(),password:password});if(out.error)throw out.error;sbUser=out.data.user}
   var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Conta conectada, mas sem autorização de administrador: "+fileError(claim.error));
   UM="Acesso de administrador confirmado.";await refreshGame()
+ }catch(e){UM=explainAuthError(e)}
+ finally{adminBusy=false;render()}
+}
+async function updateAdminPassword(){
+ var password=(document.getElementById("recovery-password")||{}).value,confirm=(document.getElementById("recovery-password-confirm")||{}).value;
+ if(!password||!confirm){setUM("Preencha e confirme a nova senha.");return}
+ if(password.length<6){setUM("Use uma senha com pelo menos 6 caracteres.");return}
+ if(password!==confirm){setUM("As senhas não correspondem.");return}
+ if(adminBusy)return;
+ adminBusy=true;UM="Salvando a nova senha…";render();
+ try{
+  await ensureSupabase();
+  var out=await sb.auth.updateUser({password:password});if(out.error)throw out.error;
+  passwordRecovery=false;
+  var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Senha atualizada, mas não foi possível confirmar o acesso de administrador: "+fileError(claim.error));
+  UM="Senha atualizada e acesso de administrador confirmado.";await refreshGame()
  }catch(e){UM=explainAuthError(e)}
  finally{adminBusy=false;render()}
 }
