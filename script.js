@@ -48,14 +48,39 @@ function tSave(){var s=Math.floor(sess(ME));if(s>0){ME.log[today()]=secs(ME,toda
 function pct(L,p,k){return Math.round(L.filter(function(m,i){return p.mods[k+i]}).length/L.length*100)}
 
 function render(){
- var names=[["estudar","✏️ Estudar"],["check","✅ Checklist"],["crono","🗓️ Cronograma"],["rank","🏆 Ranking"]];
- document.getElementById("nav").innerHTML=names.map(function(n){return '<button data-t="'+n[0]+'" class="'+(tab==n[0]?"on":"")+'">'+n[1]+'</button>'}).join("")+'<span class="sp"></span><span class="lab" id="syn">'+syn()+'</span><span class="stat">🔥 '+streak(ME)+'</span><span class="stat" id="xps">⭐ '+xp(ME)+'</span>';
+ if(!gameJoined&&!isAdmin&&!passwordRecovery){document.getElementById("nav").innerHTML='<span class="sp"></span>'+themeButton();document.getElementById("app").innerHTML=vLogin();return}
+ var names=[["estudar","✏️ Estudar"],["check","✅ Checklist"],["crono","🗓️ Cronograma"],["rank","🏆 Usuário"]];
+ document.getElementById("nav").innerHTML=names.map(function(n){return '<button data-t="'+n[0]+'" class="'+(tab==n[0]?"on":"")+'">'+n[1]+'</button>'}).join("")+'<span class="sp"></span><span class="lab" id="syn">'+syn()+'</span><span class="stat">🔥 '+streak(ME)+'</span><span class="stat" id="xps">⭐ '+xp(ME)+'</span>'+themeButton();
  var h="";
  if(tab=="estudar")h=vEstudar();else if(tab=="check")h=vCheck();else if(tab=="crono")h=vCrono();else h=vRank();
  document.getElementById("app").innerHTML=h;
 }
+function isDarkTheme(){
+ var theme=document.documentElement.getAttribute("data-theme");
+ return theme?theme=="dark":window.matchMedia("(prefers-color-scheme: dark)").matches
+}
+function themeButton(){
+ var dark=isDarkTheme(),target=dark?"claro":"escuro";
+ return '<button class="theme-toggle" data-a="theme-toggle" type="button" aria-label="Mudar para tema '+target+'" title="Mudar para tema '+target+'">'+(dark?"☀️":"🌙")+'</button>'
+}
+function toggleTheme(){
+ var theme=isDarkTheme()?"light":"dark";
+ document.documentElement.setAttribute("data-theme",theme);
+ try{localStorage.setItem("study-theme",theme)}
+ catch(e){console.error("Não foi possível salvar a preferência de tema.",e)}
+ render()
+}
+function initTheme(){
+ try{
+  var theme=localStorage.getItem("study-theme");
+  if(theme=="light"||theme=="dark")document.documentElement.setAttribute("data-theme",theme)
+ }catch(e){console.error("Não foi possível carregar a preferência de tema.",e)}
+}
+function vLogin(){
+ var hasInvite=new URLSearchParams(location.search).has("invite"),status=UM==="Este usuário ainda não faz parte do grupo. Entre como administrador ou abra um link de convite válido."?"":UM||SB_ERROR;
+ return '<section class="login"><h1>Acessar estudos</h1><p class="sub">Entre como administrador ou use um link de convite para acessar como convidado.</p><div class="card login-card"><label class="lab" for="admin-email">E-mail</label><input class="txt" id="admin-email" type="email" autocomplete="username"><label class="lab" for="admin-password">Senha</label><input class="txt" id="admin-password" type="password" autocomplete="current-password"><div class="bts"><button class="btn" style="margin:0" data-a="admin-login" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Entrar como administrador")+'</button><button class="btn g" style="margin:0" data-a="admin-signup" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Criar conta")+'</button></div><div class="login-divider"></div>'+(hasInvite?'<button class="btn" style="margin:0 auto" data-a="guest-login" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Entrar como convidado")+'</button>':'<p class="lab">As outras contas só entram como convidadas pelo link de convite. Peça o link ao administrador e abra-o aqui.')+'<div class="lab login-status" id="ust">'+esc(status)+'</div></div></section>'
+}
 var SJ={"Língua Portuguesa":"Português","Matemática":"Matemática","Conhecimentos Técnicos":"Técnicos"};
-function vSubs(){var S=["Português","Matemática","Técnicos","Revisão"],v=function(x){return (ME.subs||{})[x]||0},mx=Math.max.apply(null,S.map(v).concat(1));return '<h3 class="sec">Tempo por matéria</h3><div class="card" style="padding:8px 18px">'+S.map(function(x){return '<div style="padding:8px 0"><div style="display:flex;justify-content:space-between"><b>'+x+'</b><span class="lab">'+fh(v(x))+'</span></div><div class="bar"><i style="width:'+Math.round(v(x)/mx*100)+'%"></i></div></div>'}).join("")+'<div class="lab" style="padding-bottom:10px">Cada sessão conta para a matéria marcada na hora de salvar.</div></div>'}
 function area(t,e,bg,L,k,desc){var n=Object.keys(ME.mods).filter(function(x){return x[0]==k}).length;
  return '<div class="card ar"><div class="top" style="background:var('+bg+')"><span class="em">'+e+'</span><h2>'+t+'</h2><p>'+desc+'</p></div><div class="bot"><div><div class="big">'+pct(L,ME,k)+'%</div><div class="lab">Progresso</div></div><div><div class="big">'+n+'/'+L.length+'</div><div class="lab">Módulos</div></div><div class="acts"><button class="btn g" data-a="go" data-s="'+t+'">Módulos</button><button class="btn" style="margin-left:0" data-a="pick" data-s="'+SJ[t]+'">Estudar</button></div></div></div>'}
 function others(){var ks=Object.keys(ALL).filter(function(k){return k!=myId});
@@ -76,10 +101,10 @@ function vEstudar(){
  var sj=["Português","Matemática","Técnicos","Revisão"].map(function(x){return '<button class="chip '+(r.subj==x?"on":"")+'" data-a="subj" data-s="'+x+'">'+x+'</button>'}).join("");
  var bt=st=="run"?'<button class="btn r" style="margin:0" data-a="stop">⏹ Parar</button>':st=="stop"?'<button class="btn g" style="margin:0" data-a="start">▶ Continuar</button><button class="btn" style="margin:0" data-a="save">💾 Salvar</button>':'<button class="btn" style="margin:0" data-a="start">▶ Começar a estudar</button>';
  var pc=Math.min(100,Math.round(c/GOAL*100));
- return '<h1>Estudar</h1><p class="sub">Comece, pare e salve para registrar o tempo das últimas 24 horas. O cronômetro segue contando mesmo com a página fechada. Os registros e atividades concluídas continuam salvos. Meta: 2h a cada 24 horas.</p><hr>'+
+ return '<h1>Estudar</h1><hr>'+
  '<div class="card"><div class="timer"><div class="lab">Sala de estudos · sessão atual</div><div class="time" id="tm">'+ft(s)+'</div><div class="lab" id="td">Últimas 24h: '+fh(c)+' (com esta sessão)</div><div class="chips">'+sj+'</div><div style="max-width:420px;margin:0 auto 16px"><div class="bar"><i id="pb" style="width:'+pc+'%"></i></div><div class="lab" id="pl">'+pc+'% da meta de 2h</div></div><div class="bts">'+bt+'</div></div>'+
  '<div class="lab" style="padding:12px 18px 0;border-top:2px solid var(--line)">Quem está estudando agora</div>'+others()+'</div>'+
- vSubs()+'<h3 class="sec">Áreas do edital</h3><div class="grid">'+area("Língua Portuguesa","📝","--pt",PT,"p","9 módulos, de compreensão de texto a pronomes.")+area("Matemática","📐","--mt",MT,"m","8 módulos, de números naturais a mapas e gráficos.")+area("Conhecimentos Técnicos","🌾","--rk",TC,"t","13 módulos da apostila do 12º Censo Agropecuário, Florestal e Aquícola.")+'</div>'+
+ '<h3 class="sec">Áreas do edital</h3><div class="grid">'+area("Língua Portuguesa","📝","--pt",PT,"p","9 módulos, de compreensão de texto a pronomes.")+area("Matemática","📐","--mt",MT,"m","8 módulos, de números naturais a mapas e gráficos.")+area("Conhecimentos Técnicos","🌾","--rk",TC,"t","13 módulos da apostila do 12º Censo Agropecuário, Florestal e Aquícola.")+'</div>'+
  vUpload()+
  '<div class="note">XP: 1 por minuto salvo, 20 por módulo concluído e 5 por dia do cronograma cumprido. Para a sequência 🔥, salve ao menos 30 min no dia.</div>'}
 function vCheck(){
@@ -93,7 +118,7 @@ function vCrono(){
  return h}
 function vRank(){
  var ps=Object.keys(ALL).map(function(k){return {id:k,p:ALL[k]}}).sort(function(a,b){return xp(b.p)-xp(a.p)});
- var h='<h1>Ranking</h1><p class="sub">Quem estudar mais sobe no placar.</p><hr><div style="margin-bottom:20px"><span class="lab">Seu nome</span><br><input class="txt" id="nm" maxlength="20" placeholder="Como você quer aparecer?" value="'+esc(ME.name)+'"></div><div class="grid" style="grid-template-columns:1fr">';
+ var h='<h1>Usuário</h1><p class="sub">Quem estudar mais sobe no placar.</p><hr><div style="margin-bottom:20px"><span class="lab">Seu nome</span><br><input class="txt" id="nm" maxlength="20" placeholder="Como você quer aparecer?" value="'+esc(ME.name)+'"></div><div class="grid" style="grid-template-columns:1fr">';
  ps.forEach(function(r,i){var p=r.p,you=r.id==myId;h+='<div class="card" style="background:var('+(i==0?"--ok":"--card")+')"><div class="rk"><div class="pos">'+(i==0&&ps.length>1&&xp(p)>0?"👑":i+1)+'</div><div class="nm">'+esc(p.name||"Jogador")+(you?' <span class="lab">(você)</span>':"")+'</div><div class="m"><div class="big">'+xp(p)+'</div><div class="lab">XP</div></div><div class="m"><div class="big">'+fh(tot(p))+'</div><div class="lab">Últimas 24h</div></div><div class="m"><div class="big">'+fh(week(p))+'</div><div class="lab">7 dias</div></div><div class="m"><div class="big">'+Object.keys(p.mods||{}).length+'/30</div><div class="lab">Módulos</div></div><div class="m"><div class="big">🔥 '+streak(p)+'</div><div class="lab">Sequência</div></div></div></div>'});
  h+='</div>'+adminPanel();
  if(ps.length<2&&gameJoined&&!isAdmin)h+='<div class="note">Aguardando o administrador compartilhar um convite para o segundo jogador.</div>';
@@ -172,7 +197,9 @@ document.addEventListener("click",function(e){var b=e.target.closest("[data-t],[
  else if(a=="go"){tab="check";render();var el=document.getElementById(b.dataset.s);if(el)el.scrollIntoView()}
  else if(a=="admin-login")adminAuth("login");
  else if(a=="admin-signup")adminAuth("signup");
+ else if(a=="guest-login")guestLogin();
  else if(a=="admin-password-update")updateAdminPassword();
+ else if(a=="theme-toggle")toggleTheme();
  else if(a=="create-invite")createInvite();
  else if(a=="copy-invite")copyInvite();
  else if(a=="remove-player"){if(delF==b.dataset.i)removePlayer(b.dataset.i);else{delF=b.dataset.i;render()}}
@@ -192,14 +219,14 @@ async function ensureSupabase(){
   sbUser=session&&session.user||null;
   if(event=="PASSWORD_RECOVERY"){passwordRecovery=true;tab="rank";UM="Link de recuperação confirmado. Defina uma nova senha abaixo.";render();return}
   if((event=="SIGNED_IN"||event=="INITIAL_SESSION")&&session&&session.user.email&&!passwordRecovery&&!adminBusy){
-   adminBusy=true;UM="Confirmando o acesso de administrador…";render();
+   adminBusy=true;UM="Verificando o acesso…";render();
    setTimeout(function(){(async function(){
     try{
-     var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Não foi possível ativar o administrador: "+fileError(claim.error));
-     UM="E-mail confirmado e acesso de administrador ativado.";
-     var invite=new URLSearchParams(location.search).get("invite");
-     history.replaceState(null,"",location.pathname+(invite?"?invite="+encodeURIComponent(invite):""));
-     await refreshGame()
+     var status=await sb.rpc("study_status");if(status.error)throw status.error;
+     if(status.data.can_claim_admin&&!status.data.is_admin){var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Não foi possível ativar o administrador: "+fileError(claim.error))}
+     if(status.data.can_claim_admin||status.data.is_admin){UM="Acesso de administrador confirmado.";tab="estudar";await refreshGame()}
+     else if(status.data.joined){UM="Acesso de convidado confirmado.";tab="estudar";await refreshGame()}
+     else{UM="Esta conta não é de administrador. Abra um link de convite e entre como convidado.";render()}
     }catch(e){UM=explainAuthError(e);render()}
     finally{adminBusy=false;render()}
    })()},0)
@@ -214,10 +241,10 @@ async function ensureSupabase(){
  })();
  await authReady;return sb
 }
-async function refreshGame(){
+async function refreshGame(acceptInvite){
  myId=String(sbUser.id);
- var token=new URLSearchParams(location.search).get("invite");
- if(token){var joined=await sb.rpc("join_study_invite",{p_token:token});if(joined.error)throw new Error("Não foi possível aceitar o convite: "+fileError(joined.error));UM="Convite aceito. Você entrou como segundo jogador.";history.replaceState(null,"",location.pathname+location.hash)}
+ var token=acceptInvite&&new URLSearchParams(location.search).get("invite");
+ if(token){var joined=await sb.rpc("join_study_invite",{p_token:token});if(joined.error)throw new Error("Não foi possível aceitar o convite: "+fileError(joined.error));UM="Convite aceito. Você entrou como segundo jogador.";history.replaceState(null,"",location.pathname+location.hash);tab="estudar"}
  var st=await sb.rpc("study_status");if(st.error)throw st.error;
  gameJoined=!!st.data.joined;isAdmin=!!st.data.is_admin;memberId=st.data.member_id||"";inviteUrl=isAdmin&&st.data.invite_token?location.origin+location.pathname+"?invite="+encodeURIComponent(st.data.invite_token):"";
  inviteLocal=/^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|::1)$/i.test(location.hostname);
@@ -240,13 +267,31 @@ async function adminAuth(action){
   if(action=="signup"){
    out=await sb.auth.signUp({email:email.trim(),password:password,options:{emailRedirectTo:location.origin+location.pathname}});if(out.error)throw out.error;sbUser=out.data.session?out.data.user:null;
    if(!out.data.session){
-    if(out.data.user&&Array.isArray(out.data.user.identities)&&out.data.user.identities.length===0){UM="Este e-mail já possui cadastro. Se ainda não confirmou, procure a mensagem de confirmação no e-mail; se já confirmou, entre com a senha cadastrada.";return}
-    UM="Cadastro enviado. Abra o e-mail de confirmação do Supabase, confirme o endereço e depois entre como administrador.";return
+    if(out.data.user&&Array.isArray(out.data.user.identities)&&out.data.user.identities.length===0){UM="Este e-mail já possui cadastro. Se ainda não confirmou, procure a mensagem de confirmação; depois, entre com a senha. Contas convidadas precisam do link de convite.";return}
+    UM="Cadastro enviado. Confirme o e-mail recebido. Depois, entre com sua senha; para uma conta convidada, use também o link de convite.";return
    }
+   var status=await sb.rpc("study_status");if(status.error)throw status.error;
+   if(!status.data.can_claim_admin){UM="Conta criada, mas só o e-mail de administrador configurado pode ser administrador. Use essa conta apenas com um link de convite.";return}
   }else{out=await sb.auth.signInWithPassword({email:email.trim(),password:password});if(out.error)throw out.error;sbUser=out.data.user}
-  var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Conta conectada, mas sem autorização de administrador: "+fileError(claim.error));
-  UM="Acesso de administrador confirmado.";await refreshGame()
+  var status=await sb.rpc("study_status");if(status.error)throw status.error;
+  if(status.data.can_claim_admin){var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Não foi possível ativar o administrador: "+fileError(claim.error));UM="Acesso de administrador confirmado.";tab="estudar";await refreshGame()}
+  else if(status.data.joined){UM="Acesso de convidado confirmado.";tab="estudar";await refreshGame()}
+  else if(new URLSearchParams(location.search).has("invite")){await refreshGame(true)}
+  else{UM="Este e-mail não é o administrador. Abra o link de convite para entrar como convidado."}
  }catch(e){UM=explainAuthError(e)}
+ finally{adminBusy=false;render()}
+}
+async function guestLogin(){
+ if(adminBusy)return;
+ if(!new URLSearchParams(location.search).has("invite")){UM="Peça ao administrador um link de convite para entrar como convidado.";render();return}
+ adminBusy=true;UM="Validando o convite…";render();
+ try{
+  await ensureSupabase();
+  var email=(document.getElementById("admin-email")||{}).value,password=(document.getElementById("admin-password")||{}).value;
+  if(email||password){if(!email||!password)throw new Error("Informe o e-mail e a senha da conta convidada.");var login=await sb.auth.signInWithPassword({email:email.trim(),password:password});if(login.error)throw login.error;sbUser=login.data.user}
+  await refreshGame(true)
+ }
+ catch(e){UM="Não foi possível entrar como convidado: "+fileError(e)}
  finally{adminBusy=false;render()}
 }
 async function updateAdminPassword(){
@@ -287,4 +332,5 @@ async function initSharedFiles(){try{
  }catch(e){var msg=fileError(e);if(/anonymous sign-ins are disabled/i.test(msg))msg="Ative o login anônimo no Supabase: Authentication → Sign In / Providers → Anonymous. Depois atualize esta página.";SB_ERROR=msg}
  render()}
 initSharedFiles();
+initTheme();
 render();

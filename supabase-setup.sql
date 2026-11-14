@@ -164,9 +164,16 @@ declare
   v_token uuid;
   v_member uuid;
   v_joined boolean;
+  v_admin_email text;
+  v_user_email text;
+  v_email_confirmed boolean;
 begin
-  select admin_id, invite_token into v_admin, v_token
+  select admin_id, invite_token, admin_email into v_admin, v_token, v_admin_email
     from public.study_room where id = true;
+  select email, email_confirmed_at is not null
+    into v_user_email, v_email_confirmed
+    from auth.users where id = auth.uid();
+  v_email_confirmed := coalesce(v_email_confirmed, false);
   select exists (
     select 1 from public.study_players
     where user_id = auth.uid() and active
@@ -178,6 +185,7 @@ begin
   return jsonb_build_object(
     'joined', coalesce(v_joined, false),
     'is_admin', auth.uid() = v_admin,
+    'can_claim_admin', coalesce(v_user_email = v_admin_email and v_email_confirmed, false),
     'member_id', v_member,
     'invite_token', case when auth.uid() = v_admin then v_token else null end
   );
