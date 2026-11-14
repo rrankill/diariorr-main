@@ -224,9 +224,15 @@ as $$
 declare
   v_admin uuid;
   v_invite uuid;
+  v_email_confirmed boolean;
 begin
   if auth.uid() is null then
     raise exception 'É necessário entrar para aceitar o convite.';
+  end if;
+  select email_confirmed_at is not null into v_email_confirmed
+    from auth.users where id = auth.uid();
+  if not coalesce(v_email_confirmed, false) then
+    raise exception 'Confirme o e-mail da conta antes de aceitar o convite.';
   end if;
   select admin_id, invite_token into v_admin, v_invite
     from public.study_room where id = true for update;

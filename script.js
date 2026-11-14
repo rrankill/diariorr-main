@@ -296,7 +296,8 @@ async function guestLogin(){
  try{
   await ensureSupabase();
   var email=(document.getElementById("admin-email")||{}).value,password=(document.getElementById("admin-password")||{}).value;
-  if(email||password){if(!email||!password)throw new Error("Informe o e-mail e a senha da conta convidada.");var login=await sb.auth.signInWithPassword({email:email.trim(),password:password});if(login.error)throw login.error;sbUser=login.data.user}
+  if(!email||!password)throw new Error("Informe o e-mail e a senha da conta convidada.");
+  var login=await sb.auth.signInWithPassword({email:email.trim(),password:password});if(login.error)throw login.error;sbUser=login.data.user;
   await refreshGame(true)
  }
  catch(e){UM="Não foi possível entrar como convidado: "+fileError(e)}
