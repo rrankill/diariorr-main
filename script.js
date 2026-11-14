@@ -78,7 +78,7 @@ function initTheme(){
 }
 function vLogin(){
  var hasInvite=new URLSearchParams(location.search).has("invite"),status=UM==="Este usuário ainda não faz parte do grupo. Entre como administrador ou abra um link de convite válido."?"":UM||SB_ERROR;
- return '<section class="login"><h1>Acessar estudos</h1><p class="sub">Entre como administrador ou use um link de convite para acessar como convidado.</p><div class="card login-card"><label class="lab" for="admin-email">E-mail</label><input class="txt" id="admin-email" type="email" autocomplete="username"><label class="lab" for="admin-password">Senha</label><input class="txt" id="admin-password" type="password" autocomplete="current-password"><div class="bts"><button class="btn" style="margin:0" data-a="admin-login" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Entrar como administrador")+'</button><button class="btn g" style="margin:0" data-a="admin-signup" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Criar conta")+'</button></div><div class="login-divider"></div>'+(hasInvite?'<button class="btn" style="margin:0 auto" data-a="guest-login" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Entrar como convidado")+'</button>':'<p class="lab">As outras contas só entram como convidadas pelo link de convite. Peça o link ao administrador e abra-o aqui.')+'<div class="lab login-status" id="ust">'+esc(status)+'</div></div></section>'
+ return '<section class="login"><h1>Acessar estudos</h1><p class="sub">'+(hasInvite?"Entre como administrador ou crie/acesse uma conta convidada com este convite.":"Entre como administrador. Contas convidadas precisam do link de convite.")+'</p><div class="card login-card"><label class="lab" for="admin-email">E-mail</label><input class="txt" id="admin-email" type="email" autocomplete="username"><label class="lab" for="admin-password">'+(hasInvite?"Senha (crie uma se for novo convidado)":"Senha")+'</label><input class="txt" id="admin-password" type="password" autocomplete="'+(hasInvite?"new-password":"current-password")+'"><div class="bts"><button class="btn" style="margin:0" data-a="admin-login" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Entrar como administrador")+'</button><button class="btn g" style="margin:0" data-a="admin-signup" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":hasInvite?"Criar conta convidada":"Criar conta")+'</button></div>'+(hasInvite?'<div class="login-divider"></div><button class="btn" style="margin:0 auto" data-a="guest-login" '+(adminBusy?"disabled":"")+'>'+(adminBusy?"Aguarde…":"Entrar")+'</button>':'<p class="lab">As outras contas só entram como convidadas pelo link de convite. Peça o link ao administrador e abra-o aqui.')+'<div class="lab login-status" id="ust">'+esc(status)+'</div></div></section>'
 }
 var SJ={"Língua Portuguesa":"Português","Matemática":"Matemática","Conhecimentos Técnicos":"Técnicos"};
 function area(t,e,bg,L,k,desc){var n=Object.keys(ME.mods).filter(function(x){return x[0]==k}).length;
@@ -226,6 +226,7 @@ async function ensureSupabase(){
      if(status.data.can_claim_admin&&!status.data.is_admin){var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Não foi possível ativar o administrador: "+fileError(claim.error))}
      if(status.data.can_claim_admin||status.data.is_admin){UM="Acesso de administrador confirmado.";tab="estudar";await refreshGame()}
      else if(status.data.joined){UM="Acesso de convidado confirmado.";tab="estudar";await refreshGame()}
+     else if(new URLSearchParams(location.search).has("invite")){UM="E-mail confirmado. Clique em Entrar para aceitar o convite.";render()}
      else{UM="Esta conta não é de administrador. Abra um link de convite e entre como convidado.";render()}
     }catch(e){UM=explainAuthError(e);render()}
     finally{adminBusy=false;render()}
@@ -265,13 +266,18 @@ async function adminAuth(action){
  try{
   await ensureSupabase();var out;
   if(action=="signup"){
-   out=await sb.auth.signUp({email:email.trim(),password:password,options:{emailRedirectTo:location.origin+location.pathname}});if(out.error)throw out.error;sbUser=out.data.session?out.data.user:null;
+   var inviteToken=new URLSearchParams(location.search).get("invite");
+   var emailRedirectTo=location.origin+location.pathname+(inviteToken?"?invite="+encodeURIComponent(inviteToken):"");
+   out=await sb.auth.signUp({email:email.trim(),password:password,options:{emailRedirectTo:emailRedirectTo}});if(out.error)throw out.error;sbUser=out.data.session?out.data.user:null;
    if(!out.data.session){
-    if(out.data.user&&Array.isArray(out.data.user.identities)&&out.data.user.identities.length===0){UM="Este e-mail já possui cadastro. Se ainda não confirmou, procure a mensagem de confirmação; depois, entre com a senha. Contas convidadas precisam do link de convite.";return}
-    UM="Cadastro enviado. Confirme o e-mail recebido. Depois, entre com sua senha; para uma conta convidada, use também o link de convite.";return
+    if(out.data.user&&Array.isArray(out.data.user.identities)&&out.data.user.identities.length===0){UM="Este e-mail já possui cadastro. Se ainda não confirmou, procure a mensagem de confirmação; depois, use Entrar com sua senha.";return}
+    UM="Cadastro enviado. Confirme o e-mail recebido. Depois, volte para esta página e clique em Entrar.";return
    }
    var status=await sb.rpc("study_status");if(status.error)throw status.error;
-   if(!status.data.can_claim_admin){UM="Conta criada, mas só o e-mail de administrador configurado pode ser administrador. Use essa conta apenas com um link de convite.";return}
+   if(!status.data.can_claim_admin){
+    if(inviteToken){UM="Conta convidada criada. Confirme o e-mail e depois clique em Entrar para aceitar o convite.";return}
+    UM="Conta criada, mas só o e-mail de administrador configurado pode ser administrador. Convidados precisam de um link de convite.";return
+   }
   }else{out=await sb.auth.signInWithPassword({email:email.trim(),password:password});if(out.error)throw out.error;sbUser=out.data.user}
   var status=await sb.rpc("study_status");if(status.error)throw status.error;
   if(status.data.can_claim_admin){var claim=await sb.rpc("claim_study_admin");if(claim.error)throw new Error("Não foi possível ativar o administrador: "+fileError(claim.error));UM="Acesso de administrador confirmado.";tab="estudar";await refreshGame()}
