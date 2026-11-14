@@ -243,7 +243,8 @@ async function ensureSupabase(){
  await authReady;return sb
 }
 async function refreshGame(acceptInvite){
- myId=String(sbUser.id);
+ var nextId=String(sbUser.id);
+ if(myId!==nextId){clearTimeout(window.nt);ME=blank();myId=nextId}
  var token=acceptInvite&&new URLSearchParams(location.search).get("invite");
  if(token){var joined=await sb.rpc("join_study_invite",{p_token:token});if(joined.error)throw new Error("Não foi possível aceitar o convite: "+fileError(joined.error));UM="Convite aceito. Você entrou como segundo jogador.";history.replaceState(null,"",location.pathname+location.hash);tab="estudar"}
  var st=await sb.rpc("study_status");if(st.error)throw st.error;
@@ -266,6 +267,7 @@ async function adminAuth(action){
  try{
   await ensureSupabase();var out;
   if(action=="signup"){
+   if(sbUser&&sbUser.is_anonymous){var signedOut=await sb.auth.signOut();if(signedOut.error)throw signedOut.error;sbUser=null}
    var inviteToken=new URLSearchParams(location.search).get("invite");
    var emailRedirectTo=location.origin+location.pathname+(inviteToken?"?invite="+encodeURIComponent(inviteToken):"");
    out=await sb.auth.signUp({email:email.trim(),password:password,options:{emailRedirectTo:emailRedirectTo}});if(out.error)throw out.error;sbUser=out.data.session?out.data.user:null;
